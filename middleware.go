@@ -132,6 +132,7 @@ type authResponse struct {
 func (t token) Headers() map[string]string {
 	headers := make(map[string]string)
 	headers["X-User-Id"] = t.User.ID
+	headers["X-User-Name"] = t.User.Name
 	headers["X-User-Domain-Id"] = t.User.DomainID
 	headers["X-User-Domain-Name"] = t.User.Domain.Name
 

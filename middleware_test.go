@@ -99,7 +99,6 @@ func TestUnscopedToken(t *testing.T) {
     "user": {
       "id": "u-42e54ca0c",
       "name": "arc",
-      "description": "Arc Test",
       "email": null,
       "enabled": true,
       "domain_id": "o-testdomain",
@@ -116,6 +115,7 @@ func TestUnscopedToken(t *testing.T) {
 	h := checkHeaders(t, map[string]string{
 		"X-Identity-Status":  "Confirmed",
 		"X-User-Id":          "u-42e54ca0c",
+		"X-User-Name":        "arc",
 		"X-User-Domain-Id":   "o-testdomain",
 		"X-User-Domain-Name": "testdomain",
 		"X-Roles":            "",
