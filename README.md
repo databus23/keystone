@@ -14,7 +14,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/databus23/keystone-auth"
+	"github.com/databus23/keystone"
 )
 
 var myApp = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
