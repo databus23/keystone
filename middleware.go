@@ -17,14 +17,6 @@ import (
 	"time"
 )
 
-type authHandler struct {
-	identityEndpoint string
-	handler          http.Handler
-	client           *http.Client
-	userAgent        string
-	tokenCache       Cache
-}
-
 // Cache provides the interface for cache implmentations.
 // A simple in-memory cache implementation satisfying the Cache interface
 // is provided by github.com/pmylund/go-cache.
@@ -33,7 +25,15 @@ type Cache interface {
 	Get(k string) (interface{}, bool)
 }
 
-//Handler returns a new keystone http  middleware.
+type authHandler struct {
+	identityEndpoint string
+	handler          http.Handler
+	client           *http.Client
+	userAgent        string
+	tokenCache       Cache
+}
+
+//Handler returns a new keystone http middleware.
 //The endpoint should point to a keystone v3 url, e.g http://some.where:5000/v3.
 //The cache is optional and should be set to nil to disable token caching.
 func Handler(h http.Handler, endpoint string, cache Cache) http.Handler {
