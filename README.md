@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/databus23/keystone.png?branch=master)](https://travis-ci.org/databus23/keystone)
+
 Go Keystone Middleware
 ======================
 A go http middleware for authenticating incoming http request against Openstack Keystone. It it modelled after the original [python middleware for keystone](http://docs.openstack.org/developer/keystonemiddleware/middlewarearchitecture.html).
