@@ -23,6 +23,7 @@ var myApp = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("X-Identity-Status") == "Confirmed" {
 		fmt.Fprintf(w, "This is an authenticated request")
 		fmt.Fprintf(w, "Username: %s", r.Header.Get("X-User-Name"))
+
 	} else {
 		w.WriteHeader(401)
 		fmt.Fprintf(w, "Invalid or no token provided")
@@ -30,8 +31,8 @@ var myApp = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 })
 
 func main() {
-	auth := keystone.Auth{ Endpoint: "http://keystone.endpoint:5000/v3" }
-  handler := auth.Handler(myApp)
+	auth := keystone.Auth{Endpoint: "http://keystone.endpoint:5000/v3"}
+	handler := auth.Handler(myApp)
 	http.ListenAndServe("0.0.0.0:3000", handler)
 }
 ```
