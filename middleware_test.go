@@ -364,7 +364,7 @@ func TestTokenCacheWrite(t *testing.T) {
 		t.Fatal("token was not cached")
 	}
 	tok := v.(token)
-	if tok.ExpiresAt != expectedExpiry {
+	if !tok.ExpiresAt.Equal(expectedExpiry) {
 		t.Fatalf("cached element has incorrect value. expected %q, got %q", expectedExpiry, tok.ExpiresAt)
 	}
 
