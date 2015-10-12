@@ -25,30 +25,43 @@ type Cache interface {
 	Get(k string) (interface{}, bool)
 }
 
-type authHandler struct {
-	identityEndpoint string
-	handler          http.Handler
-	client           *http.Client
-	userAgent        string
-	tokenCache       Cache
+//Auth is the entrypoint for creating and configuraing the middlware
+type Auth struct {
+	//Keystone v3 endpoint url for validating tokens ( e.g https://some.where:5000/v3)
+	Endpoint string
+	//User-Agent used for all http request by the middlware. Defaults to go-keystone-middlware/1.0
+	UserAgent string
+	//A cache implementation the middleware should use for caching tokens. Bu default no caching is performed.
+	TokenCache Cache
+	//How long to cache tokens. Defaults to 5 minutes.
+	CacheTime time.Duration
 }
 
-//Handler returns a new keystone http middleware.
-//The endpoint should point to a keystone v3 url, e.g http://some.where:5000/v3.
-//The cache is optional and should be set to nil to disable token caching.
-func Handler(h http.Handler, endpoint string, cache Cache) http.Handler {
-	return &authHandler{
-		handler:          h,
-		identityEndpoint: endpoint,
+//Handler returns a http handler for use in a middleware chain.
+func (a *Auth) Handler(h http.Handler) http.Handler {
+	auth := handler{
+		Auth:    a,
+		handler: h,
 		client: &http.Client{
 			Timeout: 5 * time.Second,
 		},
-		userAgent:  "go-keystone-middleware/1.0",
-		tokenCache: cache,
 	}
+	if a.CacheTime == 0 {
+		a.CacheTime = 5 * time.Minute
+	}
+	if auth.UserAgent == "" {
+		auth.UserAgent = "go-keystone-middleware/1.0"
+	}
+	return &auth
 }
 
-func (h *authHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+type handler struct {
+	*Auth
+	handler http.Handler
+	client  *http.Client
+}
+
+func (h *handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	filterIncomingHeaders(req)
 	req.Header.Set("X-Identity-Status", "Invalid")
 	defer h.handler.ServeHTTP(w, req)
@@ -59,10 +72,12 @@ func (h *authHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	var context *token
 	//lookup token in cache
-	if h.tokenCache != nil {
-		if val, ok := h.tokenCache.Get(authToken); ok {
+	if h.TokenCache != nil {
+		if val, ok := h.TokenCache.Get(authToken); ok {
 			cachedToken := val.(token)
-			context = &cachedToken
+			if cachedToken.Valid() {
+				context = &cachedToken
+			}
 		}
 	}
 	if context == nil {
@@ -73,9 +88,14 @@ func (h *authHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			fmt.Println("Failed to validate token. ", err)
 			return
 		}
-	}
-	if h.tokenCache != nil {
-		h.tokenCache.Set(authToken, *context, 5*time.Minute)
+		if h.TokenCache != nil {
+			ttl := h.CacheTime
+			//The expiry date of the token provides an upper bound on the cache time
+			if expiresIn := context.ExpiresAt.Sub(time.Now()); expiresIn < h.CacheTime {
+				ttl = expiresIn
+			}
+			h.TokenCache.Set(authToken, *context, ttl)
+		}
 	}
 
 	req.Header.Set("X-Identity-Status", "Confirmed")
@@ -99,8 +119,8 @@ type project struct {
 }
 
 type token struct {
-	ExpiresAt string `json:"expires_at"`
-	IssuedAt  string `json:"issued_at"`
+	ExpiresAt time.Time `json:"expires_at"`
+	IssuedAt  time.Time `json:"issued_at"`
 	User      struct {
 		ID       string
 		Name     string
@@ -118,6 +138,11 @@ type token struct {
 		ID   string
 		Name string
 	}
+}
+
+func (t token) Valid() bool {
+	now := time.Now().Unix()
+	return t.IssuedAt.Unix() <= now && now < t.ExpiresAt.Unix()
 }
 
 type authResponse struct {
@@ -161,15 +186,15 @@ func (t token) Headers() map[string]string {
 	return headers
 }
 
-func (h *authHandler) validate(token string) (*token, error) {
+func (h *handler) validate(token string) (*token, error) {
 
-	req, err := http.NewRequest("GET", h.identityEndpoint+"/auth/tokens?nocatalog", nil)
+	req, err := http.NewRequest("GET", h.Endpoint+"/auth/tokens?nocatalog", nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("X-Auth-Token", token)
 	req.Header.Set("X-Subject-Token", token)
-	req.Header.Set("User-Agent", h.userAgent)
+	req.Header.Set("User-Agent", h.UserAgent)
 
 	r, err := h.client.Do(req)
 	if err != nil {
@@ -189,6 +214,10 @@ func (h *authHandler) validate(token string) (*token, error) {
 	}
 	if resp.Token == nil {
 		return nil, errors.New("Response didn't contain token context")
+	}
+	if !resp.Token.Valid() {
+		return nil, errors.New("Returned token is not valid")
+
 	}
 
 	return resp.Token, nil

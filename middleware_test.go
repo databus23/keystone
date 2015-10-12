@@ -1,6 +1,7 @@
 package keystone
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -56,7 +57,8 @@ func TestSpoofProtection(t *testing.T) {
 		"X-Domain-Id":       "",
 	})
 
-	Handler(h, "", nil).ServeHTTP(rec, req)
+	a := Auth{}
+	a.Handler(h).ServeHTTP(rec, req)
 
 	//Validate that checking middleware was called
 	if body := rec.Body.String(); body != ok {
@@ -75,11 +77,53 @@ func TestNoToken(t *testing.T) {
 		w.Write([]byte(ok))
 	})
 
-	Handler(h, "", nil).ServeHTTP(rec, req)
+	a := Auth{}
+	a.Handler(h).ServeHTTP(rec, req)
 
 	//Validate that checking middleware was called
 	if body := rec.Body.String(); body != ok {
 		t.Fatalf("wrong body, got %q want %q", body, ok)
+	}
+
+}
+
+func TestExpiredToken(t *testing.T) {
+	rec := httptest.NewRecorder()
+	req := newRequest("GET", "/foo")
+	req.Header.Set("X-Auth-Token", "1234")
+	idServer := identityMock(200, `
+{
+  "token": {
+    "expires_at": "2015-10-08T08:40:33.100Z",
+    "issued_at": "2015-10-08T07:40:33.099Z",
+    "methods": [
+      "password"
+    ],
+    "user": {
+      "id": "u-42e54ca0c",
+      "name": "arc",
+      "email": null,
+      "enabled": true,
+      "domain_id": "o-testdomain",
+      "default_project_id": null,
+      "domain": {
+        "id": "o-testdomain",
+        "name": "testdomain"
+      }
+    }
+  }
+}
+	`)
+	defer idServer.Close()
+
+	h := checkHeaders(t, map[string]string{
+		"X-Identity-Status": "Invalid",
+	})
+
+	a := Auth{Endpoint: idServer.URL}
+	a.Handler(h).ServeHTTP(rec, req)
+	if rec.Code != 200 {
+		t.Fatalf("wrong code, got %d want %d", rec.Code, 200)
 	}
 
 }
@@ -120,7 +164,8 @@ func TestUnscopedToken(t *testing.T) {
 		"X-User-Domain-Name": "testdomain",
 		"X-Roles":            "",
 	})
-	Handler(h, idServer.URL, nil).ServeHTTP(rec, req)
+	a := Auth{Endpoint: idServer.URL}
+	a.Handler(h).ServeHTTP(rec, req)
 	if rec.Code != 200 {
 		t.Fatalf("wrong code, got %d want %d", rec.Code, 200)
 	}
@@ -186,7 +231,8 @@ func TestProjectScopedToken(t *testing.T) {
 		"X-Project-Domain-Id":   "o-testdomain",
 		"X-Roles":               "member",
 	})
-	Handler(h, idServer.URL, nil).ServeHTTP(rec, req)
+	a := Auth{Endpoint: idServer.URL}
+	a.Handler(h).ServeHTTP(rec, req)
 	if rec.Code != 200 {
 		t.Fatalf("wrong code, got %d want %d", rec.Code, 200)
 	}
@@ -202,7 +248,7 @@ func TestDomainScopedToken(t *testing.T) {
 	idServer := identityMock(200, `
 {
   "token": {
-    "expires_at": "2015-10-09T15:09:11.727Z",
+    "expires_at": "2020-10-09T15:09:11.727Z",
     "issued_at": "2015-10-08T15:09:11.727Z",
     "methods": [
       "password"
@@ -246,7 +292,8 @@ func TestDomainScopedToken(t *testing.T) {
 		"X-Domain-Name":     "testdomain",
 		"X-Roles":           "member,blafasel",
 	})
-	Handler(h, idServer.URL, nil).ServeHTTP(rec, req)
+	a := Auth{Endpoint: idServer.URL}
+	a.Handler(h).ServeHTTP(rec, req)
 	if rec.Code != 200 {
 		t.Fatalf("wrong code, got %d want %d", rec.Code, 200)
 	}
@@ -273,13 +320,20 @@ func TestTokenCacheRead(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := newRequest("GET", "/foo")
 	req.Header.Set("X-Auth-Token", "1234")
-	cache := cacheMock{"1234": token{}}
+	cache := cacheMock{
+		"1234": token{
+			ExpiresAt: time.Now().Add(5 * time.Second),
+			IssuedAt:  time.Now(),
+		},
+	}
 
 	h := checkHeaders(t, map[string]string{
 		"X-Identity-Status": "Confirmed",
 	})
 
-	Handler(h, "http://blafasel", &cache).ServeHTTP(rec, req)
+	a := Auth{TokenCache: &cache}
+
+	a.Handler(h).ServeHTTP(rec, req)
 
 }
 
@@ -288,25 +342,30 @@ func TestTokenCacheWrite(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := newRequest("GET", "/foo")
 	req.Header.Set("X-Auth-Token", "1234")
-	idServer := identityMock(200, `
+
+	expectedExpiry := time.Now().Add(5 * time.Second).Round(time.Second)
+
+	idServer := identityMock(200, fmt.Sprintf(`
 {
   "token": {
-    "expires_at": "2015-10-09T15:09:11.727Z",
-    "issued_at": "2015-10-08T15:09:11.727Z"
+    "expires_at": "%s",
+    "issued_at": "2015-10-08T15:09:11Z"
   }
 }
-	`)
+	`, expectedExpiry.Format(time.RFC3339)))
 	defer idServer.Close()
 	h := checkHeaders(t, map[string]string{
 		"X-Identity-Status": "Confirmed",
 	})
-	Handler(h, idServer.URL, &cache).ServeHTTP(rec, req)
+	a := Auth{Endpoint: idServer.URL, TokenCache: &cache}
+	a.Handler(h).ServeHTTP(rec, req)
 	v, ok := cache["1234"]
 	if !ok {
 		t.Fatal("token was not cached")
 	}
-	if tok, ok := v.(token); !ok || tok.ExpiresAt != "2015-10-09T15:09:11.727Z" {
-		t.Fatal("cached element is not of correct type or value")
+	tok := v.(token)
+	if tok.ExpiresAt != expectedExpiry {
+		t.Fatalf("cached element has incorrect value. expected %q, got %q", expectedExpiry, tok.ExpiresAt)
 	}
 
 }
