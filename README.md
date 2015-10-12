@@ -6,6 +6,9 @@ A go http middleware for authenticating incoming http request against Openstack 
 
 The middleware authenticates incoming requests by validating the `X-Auth-Token` header and adding additional headers to the incoming request containing the validation result. The final authentication/authorisation decision is delegated to subsequent http handlers.
 
+You can view the API docs here:
+http://godoc.org/github.com/databus23/keystone
+
 Usage
 -----
 ```
