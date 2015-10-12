@@ -18,20 +18,20 @@ import (
 )
 
 // Cache provides the interface for cache implmentations.
-// A simple in-memory cache implementation satisfying the Cache interface
-// is provided by github.com/pmylund/go-cache.
+// A simple in-memory cache implementation satisfying the interface
+// is provided by https://github.com/pmylund/go-cache.
 type Cache interface {
 	Set(k string, x interface{}, ttl time.Duration)
 	Get(k string) (interface{}, bool)
 }
 
-//Auth is the entrypoint for creating and configuraing the middlware
+//Auth is the entrypoint for creating the middlware
 type Auth struct {
 	//Keystone v3 endpoint url for validating tokens ( e.g https://some.where:5000/v3)
 	Endpoint string
 	//User-Agent used for all http request by the middlware. Defaults to go-keystone-middlware/1.0
 	UserAgent string
-	//A cache implementation the middleware should use for caching tokens. Bu default no caching is performed.
+	//A cache implementation the middleware should use for caching tokens. By default no caching is performed.
 	TokenCache Cache
 	//How long to cache tokens. Defaults to 5 minutes.
 	CacheTime time.Duration
