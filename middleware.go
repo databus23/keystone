@@ -17,12 +17,14 @@ import (
 	"time"
 )
 
-// Cache provides the interface for cache implmentations.
-// A simple in-memory cache implementation satisfying the interface
-// is provided by https://github.com/pmylund/go-cache.
+// Cache provides the interface for cache implementations.
 type Cache interface {
-	Set(k string, x interface{}, ttl time.Duration)
-	Get(k string) (interface{}, bool)
+	//Set stores a value with the given ttl
+	Set(key string, value interface{}, ttl time.Duration)
+	//Get retrieves a value previously stored in the cache.
+	//value has to be a pointer to a data structure that matches the type previously given to Set
+	//The return value indicates if a value was found
+	Get(key string, value interface{}) bool
 }
 
 //Auth is the entrypoint for creating the middlware
@@ -73,11 +75,10 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	var context *token
 	//lookup token in cache
 	if h.TokenCache != nil {
-		if val, ok := h.TokenCache.Get(authToken); ok {
-			cachedToken := val.(token)
-			if cachedToken.Valid() {
-				context = &cachedToken
-			}
+		var cachedToken token
+		if ok := h.TokenCache.Get(authToken, &cachedToken); ok {
+			fmt.Println("Token from cache", cachedToken)
+			context = &cachedToken
 		}
 	}
 	if context == nil {

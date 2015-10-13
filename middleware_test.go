@@ -1,6 +1,7 @@
 package keystone
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -303,16 +304,18 @@ func TestDomainScopedToken(t *testing.T) {
 
 }
 
-type cacheMock map[string]interface{}
+type cacheMock map[string][]byte
 
-func (c cacheMock) Get(k string) (v interface{}, ok bool) {
-	v, ok = c[k]
-	return
+func (c cacheMock) Get(k string, v interface{}) bool {
+	if val, ok := c[k]; ok {
+		return json.Unmarshal(val, v) == nil
+	}
+	return false
 }
 
 func (c *cacheMock) Set(k string, v interface{}, _ time.Duration) {
 	urks := *c
-	urks[k] = v
+	urks[k], _ = json.Marshal(v)
 }
 
 func TestTokenCacheRead(t *testing.T) {
@@ -320,12 +323,8 @@ func TestTokenCacheRead(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := newRequest("GET", "/foo")
 	req.Header.Set("X-Auth-Token", "1234")
-	cache := cacheMock{
-		"1234": token{
-			ExpiresAt: time.Now().Add(5 * time.Second),
-			IssuedAt:  time.Now(),
-		},
-	}
+	val, _ := json.Marshal(token{ExpiresAt: time.Now().Add(5 * time.Second), IssuedAt: time.Now()})
+	cache := cacheMock{"1234": val}
 
 	h := checkHeaders(t, map[string]string{
 		"X-Identity-Status": "Confirmed",
@@ -359,11 +358,10 @@ func TestTokenCacheWrite(t *testing.T) {
 	})
 	a := Auth{Endpoint: idServer.URL, TokenCache: &cache}
 	a.Handler(h).ServeHTTP(rec, req)
-	v, ok := cache["1234"]
-	if !ok {
-		t.Fatal("token was not cached")
+	var tok token
+	if err := json.Unmarshal(cache["1234"], &tok); err != nil {
+		t.Fatal("token was not cached", err)
 	}
-	tok := v.(token)
 	if !tok.ExpiresAt.Equal(expectedExpiry) {
 		t.Fatalf("cached element has incorrect value. expected %q, got %q", expectedExpiry, tok.ExpiresAt)
 	}
