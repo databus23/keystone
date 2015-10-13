@@ -6,7 +6,7 @@ import (
 )
 
 func TestCache(t *testing.T) {
-	c := New()
+	c := New(5 * time.Second)
 	c.Set("test", "blafasel", 1*time.Second)
 
 	var value string
