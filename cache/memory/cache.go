@@ -1,4 +1,4 @@
-//Package memory provides an in-memory cache implmentation for https://github.com/databus23/keystone
+//Package memory provides an in-memory cache implementation for https://github.com/databus23/keystone
 package memory
 
 import (
