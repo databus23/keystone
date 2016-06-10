@@ -10,9 +10,9 @@ before_script:
 env:
   - DBNAME=travis_ci_test DBUSER=postgres
 go:
-- 1.6.2
+- 1.5
+- 1.6
 
 script:
-- go get golang.org/x/tools/cmd/vet
 - go vet ./...
 - go test -v ./...
