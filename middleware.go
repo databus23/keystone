@@ -202,6 +202,11 @@ func (h *handler) validate(token string) (*token, error) {
 		return nil, err
 	}
 	defer r.Body.Close()
+
+	if r.StatusCode >= 400 {
+		return nil, errors.New(r.Status)
+	}
+
 	var resp authResponse
 	if err = json.NewDecoder(r.Body).Decode(&resp); err != nil {
 		return nil, err
