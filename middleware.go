@@ -112,23 +112,21 @@ type domain struct {
 }
 
 type project struct {
-	ID       string
-	DomainID string `json:"domain_id"`
-	Name     string
-	Enabled  bool
-	Domain   *domain
+	ID      string
+	Name    string
+	Enabled bool
+	Domain  *domain
 }
 
 type token struct {
 	ExpiresAt time.Time `json:"expires_at"`
 	IssuedAt  time.Time `json:"issued_at"`
 	User      struct {
-		ID       string
-		Name     string
-		Email    string
-		Enabled  bool
-		DomainID string `json:"domain_id"`
-		Domain   struct {
+		ID      string
+		Name    string
+		Email   string
+		Enabled bool
+		Domain  struct {
 			ID   string
 			Name string
 		}
@@ -159,14 +157,14 @@ func (t token) Headers() map[string]string {
 	headers := make(map[string]string)
 	headers["X-User-Id"] = t.User.ID
 	headers["X-User-Name"] = t.User.Name
-	headers["X-User-Domain-Id"] = t.User.DomainID
+	headers["X-User-Domain-Id"] = t.User.Domain.ID
 	headers["X-User-Domain-Name"] = t.User.Domain.Name
 
 	if project := t.Project; project != nil {
 		headers["X-Project-Name"] = project.Name
 		headers["X-Project-Id"] = project.ID
 		headers["X-Project-Domain-Name"] = project.Domain.Name
-		headers["X-Project-Domain-Id"] = project.DomainID
+		headers["X-Project-Domain-Id"] = project.Domain.ID
 
 	}
 
