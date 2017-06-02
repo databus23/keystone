@@ -34,7 +34,7 @@ var myApp = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 })
 
 func main() {
-	auth := keystone.Auth{Endpoint: "http://keystone.endpoint:5000/v3"}
+	auth := keystone.New("http://keystone.endpoint:5000/v3")
 	handler := auth.Handler(myApp)
 	http.ListenAndServe("0.0.0.0:3000", handler)
 }

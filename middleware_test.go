@@ -323,7 +323,7 @@ func TestTokenCacheRead(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := newRequest("GET", "/foo")
 	req.Header.Set("X-Auth-Token", "1234")
-	val, _ := json.Marshal(token{ExpiresAt: time.Now().Add(5 * time.Second), IssuedAt: time.Now()})
+	val, _ := json.Marshal(Token{ExpiresAt: time.Now().Add(5 * time.Second), IssuedAt: time.Now()})
 	cache := cacheMock{"1234": val}
 
 	h := checkHeaders(t, map[string]string{
@@ -358,7 +358,7 @@ func TestTokenCacheWrite(t *testing.T) {
 	})
 	a := Auth{Endpoint: idServer.URL, TokenCache: &cache}
 	a.Handler(h).ServeHTTP(rec, req)
-	var tok token
+	var tok Token
 	if err := json.Unmarshal(cache["1234"], &tok); err != nil {
 		t.Fatal("token was not cached", err)
 	}
