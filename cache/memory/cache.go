@@ -5,7 +5,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/databus23/keystone"
+	"github.com/pmylund/go-cache"
+	"github.com/bugroger/keystone"
 )
 
 type memoryCache struct {

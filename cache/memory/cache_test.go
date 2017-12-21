@@ -3,12 +3,9 @@ package memory
 import (
 	"testing"
 	"time"
-
-	"github.com/databus23/keystone"
 )
 
 func TestCache(t *testing.T) {
-
 	c := New(5 * time.Second)
 	c.Set("test", "blafasel", 1*time.Second)
 
