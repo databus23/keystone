@@ -155,7 +155,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	context, err := h.Auth.Validate(authToken)
 	if err != nil {
 		//ToDo: How to handle logging, printing to stdout isn't the best thing
-		Log("Failed to validate token. ", err)
+		Log("Failed to validate token: %v", err)
 		return
 	}
 
